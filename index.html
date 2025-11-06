@@ -25,8 +25,9 @@ body {
   width: 100%;
   text-align: center;
   box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-  animation: fadeIn 0.7s ease;
+  transition: transform 0.3s;
 }
+.card:hover { transform: translateY(-5px); }
 h1 { color: #1e3c72; font-size: 2rem; margin-bottom: 10px; }
 .subtitle { font-weight: 500; color: #444; margin-bottom: 20px; }
 button {
@@ -37,19 +38,22 @@ button {
 }
 button:hover { background: #15315c; transform: translateY(-2px); }
 .hidden { display: none; }
-#timer { font-size: 1.3rem; font-weight: bold; color: #1e3c72; animation: pulse 1s infinite; }
+#timer { font-size: 1.3rem; font-weight: bold; color: #1e3c72; }
 .top-bar { display: flex; justify-content: space-between; padding: 12px; background: #f0f0f0; color: #333; border-radius: 12px; margin-bottom: 15px; font-weight: 500; }
 .option {
   background: #f4f4f4; padding: 12px; margin: 10px 0;
-  border-radius: 12px; cursor: pointer; transition: all 0.3s; text-align: left;
+  border-radius: 12px; cursor: pointer; text-align: left;
+  transition: 0.3s;
 }
 .option:hover { background: #d6ebff; }
-.selected { background: #1e3c72; color: white; }
+.option.selected { background: #1e3c72; color: white; font-weight: bold; }
 input#examCode { padding: 12px; width: 70%; margin: 15px 0; border-radius: 10px; border: 1px solid #ccc; font-size: 1rem; }
 .note { color: #555; font-size: 0.9rem; }
-.fade { animation: fadeIn 0.5s ease; }
-@keyframes fadeIn { from {opacity:0; transform:translateY(-20px);} to {opacity:1; transform:translateY(0);} }
-@keyframes pulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.1);} }
+#rating-display { font-weight: bold; font-size: 1.2rem; }
+.rating-Excellent { color: green; }
+.rating-Very\ Good { color: blue; }
+.rating-Good { color: orange; }
+.rating-Poor { color: red; }
 @media(max-width:700px){ .card{padding:20px;} input#examCode{width:90%;} button{padding:10px 18px; font-size:0.95rem;} }
 </style>
 </head>
@@ -68,7 +72,7 @@ input#examCode { padding: 12px; width: 70%; margin: 15px 0; border-radius: 10px;
       <span id="timer">20:00</span>
       <span id="questionCount"></span>
     </div>
-    <div id="question-container" class="fade"></div>
+    <div id="question-container"></div>
     <div class="buttons">
       <button id="prevBtn">Previous</button>
       <button id="nextBtn">Next</button>
@@ -87,7 +91,8 @@ input#examCode { padding: 12px; width: 70%; margin: 15px 0; border-radius: 10px;
 </div>
 
 <script>
-// ==================== VARIABLES ====================
+document.addEventListener("DOMContentLoaded", function() {
+
 let currentIndex = 0;
 let answers = Array(50).fill(null);
 let examCode = "";
@@ -95,7 +100,7 @@ let leaveCount = 0;
 let timeLeft = 20*60;
 let timerInterval;
 
-// ==================== QUESTIONS (1-25) ====================
+// ==================== QUESTIONS 1-50 ====================
 const questions = [
 { q: "Which of the following is a fundamental quantity?", options: ["Volume","Density","Length","Force"], answer: 2 },
 { q: "Which of the following is not a fundamental quantity?", options: ["Mass","Time","Temperature","Pressure"], answer: 3 },
@@ -115,60 +120,16 @@ const questions = [
 { q: "Acceleration is the rate of change of:", options: ["Distance","Displacement","Velocity","Force"], answer: 2 },
 { q: "The dimensional formula of force is:", options: ["MLT⁻¹","MLT⁻²","ML²T⁻³","ML⁻¹T²"], answer: 1 },
 { q: "Which is the correct unit for density?", options: ["kg/m³","N/m²","m³/kg","J/s"], answer: 0 },
-{ q: "Momentum =", options: ["Force × Time","Mass × Acceleration","Energy × Time","Pressure × Volume"], answer: 0 },
+{ q: "Momentum =", options: ["Force × Time","Mass × Velocity","Energy × Time","Pressure × Volume"], answer: 1 },
 { q: "Which quantity measures rate of doing work?", options: ["Energy","Power","Force","Velocity"], answer: 1 },
 { q: "A quantity with magnitude only is:", options: ["Velocity","Force","Temperature","Acceleration"], answer: 2 },
 { q: "Displacement is measured in:", options: ["m/s","m","m²","N"], answer: 1 },
 { q: "Speed is a:", options: ["Vector","Scalar","Derived","Fundamental"], answer: 1 },
-{ q: "Density = Mass / ?", options: ["Volume","Area","Length","Time"], answer: 0 }
-];
+{ q: "Density = Mass / ?", options: ["Volume","Area","Length","Time"], answer: 0 },
 
-// ==================== DOM ELEMENTS ====================
-const startScreen = document.getElementById("start-screen");
-const quizScreen = document.getElementById("quiz-screen");
-const resultScreen = document.getElementById("result-screen");
-const startBtn = document.getElementById("startBtn");
-const questionContainer = document.getElementById("question-container");
-const questionCount = document.getElementById("questionCount");
-const prevBtn = document.getElementById("prevBtn");
-const nextBtn = document.getElementById("nextBtn");
-const submitBtn = document.getElementById("submitBtn");
-const timerEl = document.getElementById("timer");
-const examCodeInput = document.getElementById("examCode");
-const resultMessage = document.getElementById("result-message");
-const examCodeDisplay = document.getElementById("exam-code-display");
-const scoreDisplay = document.getElementById("score-display");
-const ratingDisplay = document.getElementById("rating-display");
-
-// ==================== FUNCTIONS ====================
-function startTest() {
-  examCode = examCodeInput.value.trim();
-  if(examCode === "") { alert("Please enter your exam code!"); return; }
-  startScreen.classList.add("hidden");
-  quizScreen.classList.remove("hidden");
-  displayQuestion();
-  startTimer();
-}
-
-function displayQuestion() {
-  const q = questions[currentIndex];
-  questionContainer.innerHTML = `<h3>${currentIndex+1}. ${q.q}</h3>` +
-    q.options.map((opt,i)=>`<div class="option ${answers[currentIndex]===i?'selected':''}" onclick="selectOption(${i})">${opt}</div>`).join('');
-  questionCount.textContent = `Question ${currentIndex+1} of ${questions.length}`;
-  prevBtn.disabled = currentIndex===0;
-  nextBtn.classList.toggle("hidden", currentIndex===questions.length-1);
-  submitBtn.classList.toggle("hidden", currentIndex!==questions.length-1);
-  const opts = document.querySelectorAll(".option");
-  opts.forEach((el, idx)=>{el.style.opacity=0; el.style.transform="translateX(-30px)"; setTimeout(()=>{el.style.transition="all 0.4s ease"; el.style.opacity=1; el.style.transform="translateX(0)";}, idx*100);});
-}
-
-function selectOption(idx){ answers[currentIndex]=idx; displayQuestion(); }
-function nextQuestion(){ if(currentIndex<questions.length-1){ currentIndex++; displayQuestion(); } }
-function prevQuestion(){ if(currentIndex>0){ currentIndex--; displayQuestion(); } }// ==================== QUESTIONS (26-50) ====================
-questions.push(
 { q: "Which is a derived vector quantity?", options: ["Velocity","Mass","Temperature","Time"], answer: 0 },
 { q: "Pressure = Force / ?", options: ["Time","Area","Distance","Volume"], answer: 1 },
-{ q: "Which quantity has no direction?", options: ["Force","Velocity","Speed","Displacement"], answer: 2 },
+{ q: "Which quantity has no direction?", options: ["Force","Velocity","Speed","Displacement"], answer: ["Force","Velocity","Speed","Displacement"], answer: 2 },
 { q: "The S.I. unit of force is:", options: ["Joule","Newton","Pascal","Watt"], answer: 1 },
 { q: "Work done is measured in:", options: ["Newton","Joule","Pascal","Watt"], answer: 1 },
 { q: "Power is measured in:", options: ["Joule","Newton","Watt","Pascal"], answer: 2 },
@@ -191,11 +152,31 @@ questions.push(
 { q: "Momentum unit is:", options: ["kg m/s","kg m²/s²","N","J"], answer: 0 },
 { q: "Power formula:", options: ["Work / Time","Force × Distance","Mass × Acceleration","Velocity × Time"], answer: 0 },
 { q: "Density unit is:", options: ["kg/m³","N/m²","J/s","Watt"], answer: 0 }
-);
+];
 
-// ==================== TIMER & LEAVE DETECTION ====================
-function startTimer(){
-  timerInterval = setInterval(()=>{
+// ==================== FUNCTIONS ====================
+function displayQuestion() {
+  const q = questions[currentIndex];
+  questionContainer.innerHTML = `<h3>${currentIndex+1}. ${q.q}</h3>` +
+    q.options.map((opt,i)=>`<div class="option ${answers[currentIndex]===i?'selected':''}" onclick="selectOption(${i})">${opt}</div>`).join('');
+  questionCount.textContent = `Question ${currentIndex+1} of ${questions.length}`;
+  submitBtn.classList.toggle("hidden", currentIndex !== questions.length-1);
+}
+
+window.selectOption = function(idx) {
+  answers[currentIndex] = idx;
+  displayQuestion();
+}
+
+function nextQuestion() {
+  if(currentIndex < questions.length - 1) { currentIndex++; displayQuestion(); }
+}
+function prevQuestion() {
+  if(currentIndex > 0) { currentIndex--; displayQuestion(); }
+}
+
+function startTimer() {
+  timerInterval = setInterval(() => {
     timeLeft--;
     let m = Math.floor(timeLeft/60);
     let s = timeLeft%60;
@@ -204,31 +185,32 @@ function startTimer(){
   }, 1000);
 }
 
-// Leave detection
-window.addEventListener('blur', ()=>{
+window.addEventListener('blur', () => {
   leaveCount++;
   if(leaveCount===1){ alert("Do not leave the page again or your test will be submitted automatically!"); }
   if(leaveCount>=2){ alert("You left the page twice. Test is submitted automatically."); submitTest(); }
 });
 
-// ==================== SUBMIT ====================
-function submitTest(){
+function submitTest() {
   clearInterval(timerInterval);
   quizScreen.classList.add("hidden");
   resultScreen.classList.remove("hidden");
+
   let score = answers.reduce((acc, ans, i)=>ans===questions[i].answer ? acc+2 : acc,0);
   let rating = score>=90? "Excellent" : score>=75? "Very Good" : score>=50? "Good" : "Poor";
+
   resultMessage.textContent = "You have completed the test!";
   examCodeDisplay.textContent = `Exam Code: ${examCode}`;
   scoreDisplay.textContent = `Score: ${score}/100`;
   ratingDisplay.textContent = `Rating: ${rating}`;
+  ratingDisplay.className = `rating-${rating.replace(' ', '\\ ')}`;
 }
 
-// ==================== BUTTON EVENTS ====================
 startBtn.onclick = startTest;
 nextBtn.onclick = nextQuestion;
 prevBtn.onclick = prevQuestion;
 submitBtn.onclick = submitTest;
+
 </script>
 </body>
 </html>
