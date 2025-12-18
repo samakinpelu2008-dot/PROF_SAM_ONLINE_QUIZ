@@ -5,27 +5,43 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Football LiveScore Pro</title>
 <style>
-body {margin:0; background:#0f172a; color:#e5e7eb; font-family:Arial,sans-serif;}
-header {background:#020617; padding:15px; text-align:center; font-size:24px; font-weight:bold;}
-.container {padding:15px;}
-.match-card {background:#111827; border-radius:14px; padding:14px; margin-bottom:12px; cursor:pointer; transition:0.3s;}
+:root {
+  --bg-color-dark:#0f172a;
+  --bg-color-light:#f5f5f5;
+  --text-dark:#0f172a;
+  --text-light:#0f172a;
+  --card-dark:#111827;
+  --card-light:#ffffff;
+}
+body {margin:0; background:var(--bg-color-dark); color:#e5e7eb; font-family:Arial,sans-serif; transition:0.3s;}
+header {background:#020617; padding:15px; text-align:center; font-size:24px; font-weight:bold; position:sticky; top:0; z-index:1000;}
+.container {padding:15px; max-width:1200px; margin:auto;}
+h2,h3,h4{margin:10px 0;}
+.match-card {background:#111827; border-radius:14px; padding:14px; margin-bottom:12px; cursor:pointer; transition:0.3s; display:flex; justify-content:space-between; align-items:center;}
 .match-card:hover {background:#1f2937;}
-.teams {display:flex; justify-content:space-between; align-items:center;}
+.teams {display:flex; align-items:center; gap:10px;}
 .team {display:flex; align-items:center; gap:8px;}
-.team img {width:30px;}
-.score {font-size:22px; font-weight:bold;}
-.live {color:#22c55e; font-size:12px; margin-top:6px;}
+.team img {width:30px; border-radius:50%;}
+.score {font-size:20px; font-weight:bold;}
+.live {color:#22c55e; font-size:12px;}
 .player-grid {display:grid; grid-template-columns:repeat(auto-fit,minmax(100px,1fr)); gap:10px; margin-top:10px;}
 .player {background:#020617; padding:8px; border-radius:10px; text-align:center;}
 .player img {width:45px; border-radius:50%;}
 table {width:100%; border-collapse:collapse; margin-top:15px;}
 td, th {padding:8px; text-align:left; border-bottom:1px solid #222;}
 input[type=text]{width:100%;padding:8px;margin:10px 0;border-radius:6px;border:none;background:#1f2937;color:#e5e7eb;}
-button{padding:8px 12px;border:none;border-radius:6px;background:#22c55e;color:#0f172a;cursor:pointer;}
+button{padding:8px 12px;border:none;border-radius:6px;background:#22c55e;color:#0f172a;cursor:pointer; margin-left:4px;}
 button:hover{background:#16a34a;}
+.card-header{display:flex; align-items:center; gap:10px;}
+.card-header img{width:25px; border-radius:50%;}
+.sticky-bar{position:sticky; top:50px; display:flex; overflow-x:auto; gap:10px; background:#020617; padding:5px; border-radius:6px; margin-bottom:15px;}
+.sticky-bar::-webkit-scrollbar {height:6px;}
+.sticky-bar::-webkit-scrollbar-thumb {background:#22c55e; border-radius:3px;}
+.toggle-btn{position:fixed; top:10px; right:10px; padding:8px 12px; background:#22c55e; color:#0f172a; border:none; border-radius:6px; cursor:pointer; z-index:1001;}
 </style>
 </head>
 <body>
+<button class="toggle-btn" onclick="toggleMode()">Toggle Dark/Light Mode</button>
 <header>⚽ Football LiveScore Pro</header>
 <div class="container">
 
@@ -35,6 +51,7 @@ button:hover{background:#16a34a;}
 <div id="search-results"></div>
 
 <h2>Live Matches</h2>
+<div class="sticky-bar" id="live-bar"></div>
 <div id="live-matches"></div>
 
 <h2>League Table (Sample: EPL)</h2>
@@ -51,12 +68,23 @@ button:hover{background:#16a34a;}
 <script>
 const API_KEY = 'b59e680cd85edd235fe1debcaea59e91';
 const BASE_URL = 'https://v3.football.api-sports.io';
+let darkMode = true;
 
 async function fetchAPI(endpoint){
-    const res = await fetch(BASE_URL+endpoint, {
-        headers:{'x-apisports-key':API_KEY}
-    });
+    const res = await fetch(BASE_URL+endpoint, {headers:{'x-apisports-key':API_KEY}});
     return res.json();
+}
+
+// DARK/LIGHT MODE
+function toggleMode(){
+    darkMode=!darkMode;
+    if(darkMode){
+        document.body.style.background='var(--bg-color-dark)';
+        document.body.style.color='#e5e7eb';
+    }else{
+        document.body.style.background='var(--bg-color-light)';
+        document.body.style.color='var(--text-dark)';
+    }
 }
 
 // SEARCH FUNCTION
@@ -67,67 +95,99 @@ function searchMatches(){
         let html='<h3>Search Results:</h3>';
         if(data.response.length===0){html+='<p>No results found</p>';}
         data.response.forEach(team=>{
-            html+=`<div class='match-card'><img src='${team.team.logo}' width='40'> ${team.team.name}</div>`;
+            html+=`<div class='match-card' onclick="loadTeamMatches(${team.team.id})">
+                <img src='${team.team.logo}'> ${team.team.name}
+            </div>`;
         });
         document.getElementById('search-results').innerHTML=html;
     });
 }
 
+// Load team matches
+function loadTeamMatches(teamId){
+    fetchAPI(`/fixtures?team=${teamId}&season=2024`).then(data=>{
+        let html='<h3>Team Matches</h3>';
+        if(data.response.length===0){html+='<p>No matches found</p>';}
+        data.response.forEach(m=>{
+            html+=`<div class='match-card' onclick="loadMatch(${m.fixture.id})">
+                <div class='teams'>
+                    <div class='team'><img src='${m.teams.home.logo}'> ${m.teams.home.name}</div>
+                    <div class='score'>${m.goals.home ?? '-'} - ${m.goals.away ?? '-'}</div>
+                    <div class='team'><img src='${m.teams.away.logo}'> ${m.teams.away.name}</div>
+                </div>
+                <div class='live'>${m.fixture.status.short}</div>
+            </div>`;
+        });
+        document.getElementById('live-matches').innerHTML=html;
+    });
+}
+
 // LIVE MATCHES
-fetchAPI('/fixtures?live=all').then(data=>{
-    let html='';
+async function loadLiveMatches(){
+    const data = await fetchAPI('/fixtures?live=all');
+    let htmlBar='';
+    let htmlMain='';
     data.response.forEach(m=>{
-        html+=`<div class="match-card" onclick="loadMatch(${m.fixture.id})">
+        htmlBar+=`<div class="match-card" style="min-width:200px;" onclick="loadMatch(${m.fixture.id})">
             <div class="teams">
                 <div class="team"><img src='${m.teams.home.logo}'> ${m.teams.home.name}</div>
-                <div class="score">${m.goals.home} - ${m.goals.away}</div>
+                <div class="score">${m.goals.home ?? '-'} - ${m.goals.away ?? '-'}</div>
                 <div class="team"><img src='${m.teams.away.logo}'> ${m.teams.away.name}</div>
             </div>
-            <div class="live">${m.fixture.status.elapsed}' LIVE</div>
+            <div class="live">${m.fixture.status.short}</div>
+        </div>`;
+        htmlMain+=`<div class="match-card" onclick="loadMatch(${m.fixture.id})">
+            <div class="teams">
+                <div class="team"><img src='${m.teams.home.logo}'> ${m.teams.home.name}</div>
+                <div class="score">${m.goals.home ?? '-'} - ${m.goals.away ?? '-'}</div>
+                <div class="team"><img src='${m.teams.away.logo}'> ${m.teams.away.name}</div>
+            </div>
+            <div class="live">${m.fixture.status.short}</div>
         </div>`;
     });
-    document.getElementById('live-matches').innerHTML=html;
-
-    // Automatically load the first live match in Match Center
+    document.getElementById('live-bar').innerHTML=htmlBar;
+    document.getElementById('live-matches').innerHTML=htmlMain;
     if(data.response.length>0) loadMatch(data.response[0].fixture.id);
-});
+}
+loadLiveMatches();
+setInterval(loadLiveMatches,60000); // refresh every 60s
 
 // LEAGUE TABLE
 fetchAPI('/standings?league=39&season=2024').then(data=>{
     const table = data.response[0].league.standings[0];
     let html='<table><tr><th>Pos</th><th>Team</th><th>Points</th></tr>';
     table.forEach(t=>{
-        html+=`<tr><td>${t.rank}</td><td><img src='${t.team.logo}' width='20'> ${t.team.name}</td><td>${t.points}</td></tr>`;
+        html+=`<tr><td>${t.rank}</td><td><img src='${t.team.logo}'> ${t.team.name}</td><td>${t.points}</td></tr>`;
     });
     html+='</table>';
     document.getElementById('league-table').innerHTML=html;
 });
 
-// FIXTURES & RESULTS (last 10 and next 10)
+// FIXTURES & RESULTS
 Promise.all([
     fetchAPI('/fixtures?last=10'),
     fetchAPI('/fixtures?next=10')
 ]).then(([results,fixtures])=>{
     let html='<h3>Recent Results</h3>';
     results.response.forEach(m=>{
-        html+=`<div class='match-card'>
+        html+=`<div class='match-card' onclick="loadMatch(${m.fixture.id})">
             <div class='teams'>
                 <div class='team'><img src='${m.teams.home.logo}'> ${m.teams.home.name}</div>
-                <div class='score'>${m.goals.home} - ${m.goals.away}</div>
+                <div class='score'>${m.goals.home ?? '-'} - ${m.goals.away ?? '-'}</div>
                 <div class='team'><img src='${m.teams.away.logo}'> ${m.teams.away.name}</div>
             </div>
-            <small>${new Date(m.fixture.date).toLocaleString()}</small>
+            <div class='live'>${m.fixture.status.short}</div>
         </div>`;
     });
     html+='<h3>Upcoming Fixtures</h3>';
     fixtures.response.forEach(m=>{
-        html+=`<div class='match-card'>
+        html+=`<div class='match-card' onclick="loadMatch(${m.fixture.id})">
             <div class='teams'>
                 <div class='team'><img src='${m.teams.home.logo}'> ${m.teams.home.name}</div>
                 <div class='score'>-</div>
                 <div class='team'><img src='${m.teams.away.logo}'> ${m.teams.away.name}</div>
             </div>
-            <small>${new Date(m.fixture.date).toLocaleString()}</small>
+            <div class='live'>${m.fixture.status.short}</div>
         </div>`;
     });
     document.getElementById('fixtures-results').innerHTML=html;
@@ -135,11 +195,10 @@ Promise.all([
 
 // LOAD MATCH CENTER
 function loadMatch(fixtureId){
-    // Lineups
     fetchAPI(`/fixtures/lineups?fixture=${fixtureId}`).then(data=>{
         let html='';
         data.response.forEach(team=>{
-            html+=`<h4><img src='${team.team.logo}' width='25'> ${team.team.name}</h4><div class='player-grid'>`;
+            html+=`<h4 class='card-header'><img src='${team.team.logo}'> ${team.team.name}</h4><div class='player-grid'>`;
             team.startXI.forEach(p=>{
                 html+=`<div class='player'><img src='${p.player.photo}'><div>${p.player.name}</div><small>${p.player.pos}</small></div>`;
             });
@@ -148,7 +207,6 @@ function loadMatch(fixtureId){
         document.getElementById('lineups').innerHTML=html;
     });
 
-    // Events
     fetchAPI(`/fixtures/events?fixture=${fixtureId}`).then(data=>{
         let html='';
         data.response.forEach(e=>{
