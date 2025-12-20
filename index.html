@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>LiveScore Ultimate</title>
+<title>LiveScore Optimized</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -145,16 +145,16 @@ async function api(u){
   return d.response||[];
 }
 
-// MATCH HTML with minute + injury time
+// MATCH HTML with lazy images + injury time
 function matchHTML(f,live=false){
   let elapsed=f.fixture.status.elapsed || 0;
   if(f.fixture.status.extra) elapsed += "+" + f.fixture.status.extra;
   return `<div class="match" onclick="openMatch(${f.fixture.id})">
     ${live?'<span class="live-dot"></span>LIVE '+elapsed+"' ":""}
     <div class="row">
-      <div class="team"><img src="${f.teams.home.logo}">${f.teams.home.name}</div>
+      <div class="team"><img src="${f.teams.home.logo}" loading="lazy">${f.teams.home.name}</div>
       <div class="score" id="score-${f.fixture.id}">${f.goals.home??"-"} : ${f.goals.away??"-"} <span class="meta-score">8</span></div>
-      <div class="team right">${f.teams.away.name}<img src="${f.teams.away.logo}"></div>
+      <div class="team right">${f.teams.away.name}<img src="${f.teams.away.logo}" loading="lazy"></div>
     </div>
   </div>`;
 }
@@ -169,7 +169,7 @@ function groupByLeague(matches){
   return obj;
 }
 
-// LOAD FIXTURES
+// LOAD LIVE MATCHES FIRST
 async function loadFixtures(){
   const league=document.getElementById("league").value;
   const date=new Date().toISOString().split("T")[0];
@@ -186,10 +186,19 @@ async function loadFixtures(){
   if(live.length){
     box.innerHTML="<h4>Live Matches</h4>";
     live.forEach(f=>box.innerHTML+=matchHTML(f,true));
-    box.innerHTML+='<button class="view-more" onclick="alert(\'All live matches\')">View More</button>';
+    box.innerHTML+='<button class="view-more" onclick="loadLeagueMatches()">View More</button>';
   }
+}
 
-  const grouped=groupByLeague(others);
+// LOAD LEAGUE MATCHES ON DEMAND
+async function loadLeagueMatches(){
+  const league=document.getElementById("league").value;
+  const date=new Date().toISOString().split("T")[0];
+  let u=`/fixtures?date=${date}`;
+  if(league) u+=`&league=${league}`;
+  const data=await api(u);
+  const box=document.getElementById("matches");
+  const grouped=groupByLeague(data.filter(m=>m.fixture.status.short!=="LIVE"));
   for(const l in grouped){
     box.innerHTML+=`<h4>${l}</h4>`;
     grouped[l].forEach(f=>box.innerHTML+=matchHTML(f,false));
@@ -215,7 +224,7 @@ async function tab(t){
     const d=await api(`/fixtures/lineups?fixture=${match.fixture.id}`);
     d.forEach(team=>{
       c.innerHTML+=`<h4>${team.team.name}</h4>`;
-      team.startXI.forEach(p=>c.innerHTML+=`<div class="player"><img src="${p.player.photo}">${p.player.name} (${p.player.pos})</div>`);
+      team.startXI.forEach(p=>c.innerHTML+=`<div class="player"><img src="${p.player.photo}" loading="lazy">${p.player.name} (${p.player.pos})</div>`);
     });
   }
   if(t==="events"){
@@ -242,7 +251,6 @@ setInterval(async () => {
   const data = await api(u);
   const live = data.filter(m => m.fixture.status.short === "LIVE");
   if(live.length){
-    const box = document.getElementById("matches");
     live.forEach(f=>{
       const scoreEl=document.getElementById(`score-${f.fixture.id}`);
       if(scoreEl && scoreEl.innerText !== `${f.goals.home??"-"} : ${f.goals.away??"-"} 8`){
@@ -260,12 +268,12 @@ function showAd(){
   const a=ads[adIndex];
   const banner=document.createElement("div");
   banner.className="ad-banner";
-  banner.innerHTML=`${a.link.includes("youtube")?'<iframe width="100%" height="80" src="'+a.link+'" frameborder="0" allowfullscreen></iframe>':'<img src="'+a.link+'" style="max-width:100%;border-radius:6px">'}`;
+  banner.innerHTML=`${a.link.includes("youtube")?'<iframe width="100%" height="80" src="'+a.link+'" frameborder="0" allowfullscreen></iframe>':'<img src="'+a.link+'" loading="lazy" style="max-width:100%;border-radius:6px">'}`;
   banner.onclick=()=>window.open(a.redirect,"_blank");
   document.getElementById("matches").appendChild(banner);
   adIndex=(adIndex+1)%ads.length;
 }
-setInterval(showAd,300000); // every 5 mins
+setInterval(showAd,300000);
 
 document.getElementById("league").onchange=loadFixtures;
 loadFixtures();
